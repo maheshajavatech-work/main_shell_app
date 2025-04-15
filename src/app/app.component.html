@@ -1,0 +1,13 @@
+<nav class="navbar">
+  <div class="container">
+    <a [routerLink]="['/home']" class="nav-brand">Micro-Frontend App</a>
+    <div class="nav-links">
+      <a [routerLink]="['/home']" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+      <a [routerLink]="['/tasks']" routerLinkActive="active">Tasks</a>
+      <a [routerLink]="['/reports']" routerLinkActive="active">Reports</a>
+      <a [routerLink]="['/settings']" routerLinkActive="active">Settings</a>
+    </div>
+  </div>
+</nav>
+
+<router-outlet></router-outlet>

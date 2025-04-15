@@ -1,0 +1,57 @@
+<div class="shell-container">
+  <!-- Welcome Banner -->
+  <div class="welcome-banner">
+    <h1>Welcome to Our MFE</h1>
+    <p>A modular platform built with Angular and Module Federation</p>
+  </div>
+
+  <!-- Clickable Cards -->
+  <div class="card-container">
+    <a [routerLink]="['/tasks']" class="card">
+      <div class="card-icon">📋</div>
+      <h2>Tasks</h2>
+      <p>Manage your tasks and track progress</p>
+    </a>
+    
+    <a [routerLink]="['/reports']" class="card">
+      <div class="card-icon">📊</div>
+      <h2>Reports</h2>
+      <p>View analytics and generate reports</p>
+    </a>
+    
+    <a [routerLink]="['/settings']" class="card">
+      <div class="card-icon">⚙️</div>
+      <h2>Settings</h2>
+      <p>Configure your application preferences</p>
+    </a>
+  </div>
+
+<!-- Architecture Guide -->
+<div class="guide-section">
+  <h2 class="guide-title">How This Modular App Works</h2>
+  
+  <div class="guide-grid">
+    <div class="guide-card">
+      <h3>1. Shell App</h3>
+      <p>This is the main host that contains shared layout, navbar, and global styles. It dynamically loads micro-frontends based on route configuration.</p>
+    </div>
+
+    <div class="guide-card">
+      <h3>2. Micro-Frontends (MFEs)</h3>
+      <p>Each feature (Tasks, Reports, Settings) is built and deployed independently as an Angular app. These MFEs are lazy-loaded into the shell only when the route is accessed.</p>
+    </div>
+
+    <div class="guide-card">
+      <h3>3. Remote Module Federation</h3>
+      <p>Angular Module Federation loads routes or components remotely using the <code>remoteEntry.js</code> exposed by each MFE.</p>
+    </div>
+  </div>
+
+  <div class="guide-highlight">
+    <h3>📊 Example: Reports MFE</h3>
+    <p>When you navigate to <code>/reports</code>, the shell app dynamically fetches <code>remoteEntry.js</code> from the Reports MFE running on <code>localhost:4202</code>.</p>
+    <p>The file exposes <code>./Module</code> which contains the Angular routes for Reports. These routes are rendered inside the shell seamlessly.</p>
+    <p>This allows the Reports app to evolve independently — teams can develop and deploy it without touching the shell or other MFEs!</p>
+  </div>
+</div>
+
