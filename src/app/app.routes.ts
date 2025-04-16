@@ -1,4 +1,3 @@
-
 import { loadRemoteModule } from '@angular-architects/module-federation';
 import { Routes } from '@angular/router';
 import { HomeComponent } from './home/home.component';
@@ -17,8 +16,8 @@ export const routes: Routes = [
     path: 'tasks',
     loadChildren: () =>
       loadRemoteModule({
-        type: 'module',
-        remoteEntry: 'http://localhost:4201/remoteEntry.js',
+        type: 'manifest',
+        remoteName: 'tasks_mfe',
         exposedModule: './Module',
       }).then(m => m.routes),
   },
@@ -26,8 +25,8 @@ export const routes: Routes = [
     path: 'reports',
     loadChildren: () =>
       loadRemoteModule({
-        type: 'module',
-        remoteEntry: 'http://localhost:4202/remoteEntry.js',
+        type: 'manifest',
+        remoteName: 'reports_mfe',
         exposedModule: './Module',
       }).then(m => m.routes),
   },
@@ -35,8 +34,8 @@ export const routes: Routes = [
     path: 'settings',
     loadChildren: () =>
       loadRemoteModule({
-        type: 'module',
-        remoteEntry: 'http://localhost:4203/remoteEntry.js',
+        type: 'manifest',
+        remoteName: 'settings_mfe',
         exposedModule: './Module',
       }).then(m => m.routes),
   },
