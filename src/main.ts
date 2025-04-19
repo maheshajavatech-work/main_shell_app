@@ -1,15 +1,15 @@
 import { loadManifest } from '@angular-architects/module-federation';
 import { environment } from './environments/environment';
 
+// The manifest path should be relative to the deployed application
+const manifestPath = environment.production
+  ? 'assets/mf.manifest.prod.json'
+  : 'assets/mf.manifest.local.json';
 
-const manifestFile = environment.production
-  ? '/assets/mf.manifest.prod.json'
-  : '/assets/mf.manifest.local.json';
+console.log('Production?', environment.production);
+console.log('Loading manifest from:', manifestPath);
 
-  console.log('Production?', environment.production);
-
-loadManifest(manifestFile)
+loadManifest(manifestPath)
   .catch(err => console.error('Error loading remote entries from manifest:', err))
   .then(() => import('./bootstrap'))
   .catch(err => console.error('Error bootstrapping app:', err));
-
