@@ -1,34 +1,31 @@
 import { loadRemoteModule } from '@angular-architects/module-federation';
-import { Routes } from '@angular/router';
-import { HomeComponent } from './home/home.component';
+import { Routes }             from '@angular/router';
+import { HomeComponent }      from './home/home.component';
+import { VersionService }     from './services/version.service';
 
 export const routes: Routes = [
-  {
-    path: '',
-    pathMatch: 'full',
-    redirectTo: 'home'
-  },
-  {
-    path: 'home',
-    component: HomeComponent
-  },
+  { path: '',      pathMatch: 'full', redirectTo: 'home' },
+  { path: 'home',  component: HomeComponent },
   {
     path: 'tasks',
-    loadChildren: () =>
-      loadRemoteModule({
+    loadChildren: () => {
+      const remoteKey = VersionService.getRemoteKey('tasks_mfe');
+      return loadRemoteModule({
         type: 'manifest',
-        remoteName: 'tasks_mfe',
-        exposedModule: './Module',
-      }).then(m => m.routes),
+        remoteName: remoteKey,
+        exposedModule: './Module'
+      }).then(m => m.routes);
+    }
   },
+  // reports & settings unchanged
   {
     path: 'reports',
     loadChildren: () =>
       loadRemoteModule({
         type: 'manifest',
         remoteName: 'reports_mfe',
-        exposedModule: './Module',
-      }).then(m => m.routes),
+        exposedModule: './Module'
+      }).then(m => m.routes)
   },
   {
     path: 'settings',
@@ -36,7 +33,7 @@ export const routes: Routes = [
       loadRemoteModule({
         type: 'manifest',
         remoteName: 'settings_mfe',
-        exposedModule: './Module',
-      }).then(m => m.routes),
-  },
+        exposedModule: './Module'
+      }).then(m => m.routes)
+  }
 ];

@@ -1,319 +1,204 @@
-# Module Federation Instruction Guide
+# Step‑by‑Step Guide to Implement Versioned Module Federation
 
-This document explains how the **Shell Application** communicates with multiple Micro Frontends (MFEs) using **Webpack Module Federation**, covering both **local development** and **production** setups, including versioning and dynamic loading.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Architecture Components](#architecture-components)
-3. [Local Development Setup](#local-development-setup)
-4. [Production Build Setup](#production-build-setup)
-5. [Versioning Strategy](#versioning-strategy)
-6. [Runtime Communication Flow](#runtime-communication-flow)
-7. [Troubleshooting Tips](#troubleshooting-tips)
-8. [Dynamic Versioning Implementation Plan](#dynamic-versioning-implementation-plan)
+This guide walks you through adding versioning to your **tasks_mfe** and loading specific versions from the **Shell Application** using Webpack Module Federation. We’ll cover both **build** and **runtime** changes, and how to serve multiple versions locally.
 
 ---
 
-## Dynamic Versioning Implementation Plan
+## Prerequisites
 
-### Overview
+- Angular CLI (v19+) installed
+- `@angular-architects/module-federation` plugin added to both shell and MFE projects
+- Node.js (>=16) and npm
 
-This plan outlines the implementation of dynamic versioning for the Reports MFE, allowing the shell application to load specific versions based on manifest files.
+---
 
-### 1. Update Manifest Structure
+## Part 1: Prepare the Tasks MFE for Versioning
 
-#### Changes to `src/assets/mf.manifest.local.json` in Shell: ✅ (COMPLETED)
+### 1.1. Install `cross-env`
 
-Current structure:
-```json
-{
-  "tasks_mfe": "http://localhost:4201/remoteEntry.js",
-  "reports_mfe": "http://localhost:4202/remoteEntry.js",
-  "settings_mfe": "http://localhost:4203/remoteEntry.js"
+```bash
+cd path/to/tasks_mfe
+npm install --save-dev cross-env
+```
+
+### 1.2. Parameterize `MFE_VERSION` in Webpack Config
+
+Edit **`webpack.config.js`** in `tasks_mfe`: pull in `process.env.MFE_VERSION` and use it for `name`, `publicPath`, and output directory:
+
+```js
+const { shareAll, withModuleFederationPlugin } =
+  require('@angular-architects/module-federation/webpack');
+const webpack = require('webpack');
+
+// 1. Get MFE_VERSION from env (default 1.0.0)
+const version = process.env.MFE_VERSION || '1.0.0';
+const port    = 4201;
+const name    = `tasks_mfe_v${version}`;
+const publicPath = `http://localhost:${port}/v${version}/`;
+
+module.exports = withModuleFederationPlugin(
+  {
+    name,
+    filename: 'remoteEntry.js',
+    exposes: { './Module': 'src/app/feature/feature.routes.ts' },
+    shared: shareAll({ singleton: true, strictVersion: true, requiredVersion: 'auto' })
+  },
+  {
+    output: {
+      publicPath,
+      uniqueName: name,
+      chunkLoading: 'jsonp',
+      library: { type: 'var', name }
+    },
+    plugins: [
+      new webpack.DefinePlugin({
+        'process.env.MFE_APP_VERSION': JSON.stringify(version)
+      })
+    ]
+  }
+);
+```
+
+### 1.3. Update `package.json` Scripts for Versioned Builds
+
+In `tasks_mfe/package.json`:
+
+```jsonc
+"scripts": {
+  "build:v1.0.0": "cross-env MFE_VERSION=1.0.0 ng build --configuration production",
+  "build:v1.1.0": "cross-env MFE_VERSION=1.1.0 ng build --configuration production",
+  "serve:dist": "npm run build:v1.0.0 && npm run build:v1.1.0 && http-server --watch ./dist/tasks_mfe -p 4201"
 }
 ```
 
-Proposed structure:
+Install `http-server` for static serving:
+
+```bash
+npm install --save-dev http-server
+```
+
+---
+
+## Part 2: Serving Multiple Versions Locally
+
+### 2.1. Build Versioned Outputs
+
+```bash
+eval "npm run build:v1.0.0"
+eval "npm run build:v1.1.0"
+```
+
+This produces:
+```
+dist/tasks_mfe/v1.0.0/remoteEntry.js
+dist/tasks_mfe/v1.1.0/remoteEntry.js
+...other chunks under each version folder...
+```
+
+### 2.2. Serve via `http-server`
+
+```bash
+npm run serve:dist
+```
+
+Now:
+- `http://localhost:4201/v1.0.0/remoteEntry.js`
+- `http://localhost:4201/v1.1.0/remoteEntry.js`
+
+Should both resolve correctly.
+
+---
+
+## Part 3: Update the Shell Application
+
+### 3.1. Shell Manifest with Versioned Entries
+
+Edit **`shell/src/assets/mf.manifest.local.json`**:
+
 ```json
 {
-  "tasks_mfe": "http://localhost:4201/remoteEntry.js",
-  "reports_mfe": "http://localhost:4202/assets/mf.manifest.local.json",
-  "settings_mfe": "http://localhost:4203/remoteEntry.js"
+  "tasks_mfe_v1.0.0": "http://localhost:4201/v1.0.0/assets/mf.manifest.local.json",
+  "tasks_mfe_v1.1.0": "http://localhost:4201/v1.1.0/assets/mf.manifest.local.json",
+  "reports_mfe":        "http://localhost:4202/assets/mf.manifest.local.json",
+  "settings_mfe":       "http://localhost:4203/assets/mf.manifest.local.json"
 }
 ```
 
-#### New file needed in Reports MFE: ✅ (COMPLETED)
+Each versioned manifest (e.g. `v1.0.0/assets/mf.manifest.local.json`) should contain:
+
 ```json
-{
-  "remoteEntry": "http://localhost:4202/v1.0.0/remoteEntry.js",
-  "version": "v1.0.0"
+{ "remoteEntry": "http://localhost:4201/v1.0.0/remoteEntry.js", "version": "1.0.0" }
+```
+
+### 3.2. Add a Version Selection Service
+
+Generate a service:
+```bash
+ng generate service core/config/version
+```
+
+Implement **`VersionService`** in `shell/src/app/core/config/version.service.ts`:
+
+```ts
+@Injectable({ providedIn: 'root' })
+export class VersionService {
+  private versions = { tasks_mfe: '1.0.0' };
+
+  get(versionKey: string): string {
+    // Optionally override via URL param
+    const param = new URLSearchParams(location.search).get('tasksVersion');
+    return param || this.versions[versionKey];
+  }
+
+  manifestKey(base: string) {
+    const v = this.get(base);
+    return `${base}_v${v}`;
+  }
 }
 ```
 
-### 2. Update Shell Application ✅ (COMPLETED)
+### 3.3. Adapt `main.ts` to Use All Manifest Keys
 
-#### Changes to `src/main.ts`: ✅ (COMPLETED)
-- Modify to handle both direct remoteEntry URLs and nested manifest files
-- Parse the Reports MFE manifest to extract version and remoteEntry URL
+Ensure your loader fetches **every** key in the shell manifest (including `tasks_mfe_v1.0.0`, `tasks_mfe_v1.1.0`). Then `remoteManifests[...]` will hold each version’s entry.
 
-```typescript
-import { enableProdMode } from '@angular/core';
-import { environment } from './environments/environment';
+### 3.4. Update Route Loader to Pick a Version
 
-interface RemoteManifest { remoteEntry: string; version: string; }
-export const remoteManifests: Record<string, RemoteManifest> = {};
+In `shell/src/app/app.routes.ts`:
 
-if (environment.production) enableProdMode();
+```ts
+import { VersionService } from './core/config/version.service';
 
-const manifestPath = environment.production
-  ? 'assets/mf.manifest.prod.json'
-  : 'assets/mf.manifest.local.json';
+const versionService = inject(VersionService);
 
-console.log('Environment:', environment.production ? 'Production' : 'Development');
-console.log('Loading manifest from:', manifestPath);
-
-fetch(manifestPath)
-  .then(r => r.json())
-  .then(async shellMan => {
-    const loaders = Object.entries(shellMan).map(async ([name, url]) => {
-      try {
-        // Check if URL ends with remoteEntry.js (direct) or points to a manifest
-        if (typeof url === 'string' && url.endsWith('remoteEntry.js')) {
-          // Direct remoteEntry URL
-          remoteManifests[name] = { remoteEntry: url, version: 'default' };
-          console.log(`✅ Loaded ${name} (direct)`);
-        } else {
-          // Nested manifest URL
-          const res = await fetch(url as string);
-          const m = await res.json() as RemoteManifest;
-          remoteManifests[name] = { remoteEntry: m.remoteEntry, version: m.version };
-          console.log(`✅ Loaded ${name} v${m.version}`);
-        }
-      } catch (e) {
-        console.warn(`⚠️ Skipping ${name}`, e);
-      }
-    });
-    await Promise.allSettled(loaders);
-  })
-  .then(() => import('./bootstrap'))
-  .catch(e => {
-    console.error('Error loading manifests:', e);
-    // If there's an error loading the manifests, still try to bootstrap the app
-    import('./bootstrap').catch(err => console.error('Error bootstrapping app:', err));
-  });
-```
-
-#### Changes to `src/app/app.routes.ts`: ✅ (COMPLETED)
-- Update the Reports MFE route to use the dynamic remoteEntry URL
-
-```typescript
-import { loadRemoteModule } from '@angular-architects/module-federation';
-import { Routes } from '@angular/router';
-import { HomeComponent } from './home/home.component';
-import { remoteManifests } from '../main';
+export function loadVersionedMfe(base: string, modulePath: string) {
+  const key = versionService.manifestKey(base);
+  const entry = remoteManifests[key]?.remoteEntry;
+  if (!entry) {
+    throw new Error(`No manifest found for ${key}`);
+  }
+  return loadRemoteModule({ type: 'module', remoteEntry: entry, exposedModule: modulePath })
+    .then(m => m.routes);
+}
 
 export const routes: Routes = [
-  {
-    path: '',
-    pathMatch: 'full',
-    redirectTo: 'home'
-  },
-  {
-    path: 'home',
-    component: HomeComponent
-  },
-  {
-    path: 'tasks',
-    loadChildren: () =>
-      loadRemoteModule({
-        type: 'manifest',
-        remoteName: 'tasks_mfe',
-        exposedModule: './Module',
-      }).then(m => m.routes),
-  },
-  {
-    path: 'reports',
-    loadChildren: () => {
-      // Use the dynamic remoteEntry URL from the manifest
-      const remoteEntry = remoteManifests['reports_mfe']?.remoteEntry;
-      return loadRemoteModule({
-        type: 'module',
-        remoteEntry,
-        exposedModule: './Module',
-      }).then(m => m.routes);
-    },
-  },
-  {
-    path: 'settings',
-    loadChildren: () =>
-      loadRemoteModule({
-        type: 'manifest',
-        remoteName: 'settings_mfe',
-        exposedModule: './Module',
-      }).then(m => m.routes),
-  },
+  { path: 'tasks', loadChildren: () => loadVersionedMfe('tasks_mfe', './Module') },
+  // … other routes …
 ];
 ```
 
-### 3. Update Reports MFE (✅ COMPLETED)
+---
 
-#### Build Configuration: ✅
-- ✅ Reports MFE has been configured to output to versioned folders (`/v1.0.0/`)
-- ✅ The application has been built and files are in the correct versioned directory structure: `dist/reports/v1.0.0/`
+## Part 4: Verification & Troubleshooting
 
-#### Manifest Configuration: ✅
-- ✅ Created `mf.manifest.local.json` in the Reports MFE with the following content:
-
-```json
-{
-  "remoteEntry": "http://localhost:4202/v1.0.0/remoteEntry.js",
-  "version": "v1.0.0"
-}
-```
-
-- ✅ The manifest file is properly placed in the `dist/reports/assets` directory
-
-#### Original Implementation Plan (Reference Only):
-
-```javascript
-// webpack.config.js in reports_mfe
-const { shareAll, withModuleFederationPlugin } = require('@angular-architects/module-federation/webpack');
-
-// Get version from package.json or environment
-const version = require('./package.json').version;
-const versionedPath = `/v${version}/`;
-
-module.exports = withModuleFederationPlugin({
-  name: 'reports_mfe',
-  exposes: {
-    './Module': './src/app/reports/reports.module.ts',
-  },
-  shared: shareAll({ singleton: true, strictVersion: true, requiredVersion: 'auto' }),
-}, {
-  output: {
-    publicPath: versionedPath,
-    uniqueName: 'reports_mfe'
-  }
-});
-```
-
-```json
-// package.json in reports_mfe
-{
-  "scripts": {
-    "start": "ng serve --port 4202 --live-reload false",
-    "build": "ng build --configuration production",
-    "postbuild": "node scripts/create-manifest.js"
-  }
-}
-```
-
-```javascript
-// scripts/create-manifest.js in reports_mfe
-const fs = require('fs');
-const path = require('path');
-const version = require('../package.json').version;
-
-const manifest = {
-  remoteEntry: `http://localhost:4202/v${version}/remoteEntry.js`,
-  version: `v${version}`
-};
-
-// Ensure assets directory exists
-if (!fs.existsSync(path.join(__dirname, '../dist/reports/assets'))) {
-  fs.mkdirSync(path.join(__dirname, '../dist/reports/assets'), { recursive: true });
-}
-
-// Write manifest file
-fs.writeFileSync(
-  path.join(__dirname, '../dist/reports/assets/mf.manifest.local.json'),
-  JSON.stringify(manifest, null, 2)
-);
-
-console.log(`Created manifest for version v${version}`);
-```
-
-### 4. Testing Strategy ✅ (COMPLETED)
-
-#### Version Testing: ✅
-- ✅ Successfully tested with Reports MFE version v1.0.0
-- ✅ Shell application correctly loads the versioned remoteEntry.js from the Reports MFE
-
-#### Fallback Mechanism: ✅
-- ✅ Implemented fallback in main.ts to handle errors when loading manifests
-- ✅ Shell application will still bootstrap even if there's an error loading the manifests
+1. **Run Shell**: `npm start` → navigate to `/home`, see no errors.  
+2. **Navigate to `/tasks`**: verify the chosen version loads (check console log of `process.env.MFE_APP_VERSION`).  
+3. **Override Version**: append `?tasksVersion=1.1.0` to URL and refresh—shell should now load v1.1.0.  
+4. **Common Issues**:  
+   - 404 on `/v1.0.0/remoteEntry.js`: check static server path.  
+   - CORS: add `Access-Control-Allow-Origin: *` in MFE dev server.  
+   - Runtime errors: ensure `chunkLoading: 'jsonp'` + `library: { type: 'var' }` in your shell webpack.
 
 ---
 
-## Implementation Summary
+*End of Guide*
 
-### What We've Accomplished
-
-1. **Reports MFE Versioning**: ✅
-   - Configured Reports MFE to serve from versioned path `/v1.0.0/`
-   - Created manifest file with version information
-
-2. **Shell Application Updates**: ✅
-   - Updated manifest to point to Reports MFE's manifest
-   - Modified main.ts to handle nested manifests
-   - Updated app.routes.ts to use dynamic remoteEntry URL
-   - Fixed webpack configuration to prevent eager consumption errors
-   - Added fallback mechanism in app.routes.ts for Reports MFE
-
-3. **Testing**: ✅
-   - Verified the shell can load the versioned Reports MFE
-   - Implemented fallback mechanisms for error handling
-
-### Webpack Configuration Fixes
-
-1. **Fixed Webpack Configuration**:
-   - Updated webpack configuration to use a custom webpack config function
-   - Added proper support for ES modules and import.meta usage
-   - Fixed the "Cannot use 'import.meta' outside a module" error
-
-2. **Fixed Eager Consumption Error**:
-   - Explicitly set `eager: false` for specific Angular packages
-   - This prevents the `Shared module is not available for eager consumption` error
-   - Used a more granular approach instead of setting eager: false for all packages
-
-3. **Added Top-Level Await Support**:
-   - Enabled the `topLevelAwait` experiment in webpack configuration
-   - This allows using await at the top level of modules
-   - Implemented in a way that's compatible with Module Federation Plugin
-
-4. **Improved Manifest Loading**:
-   - Updated main.ts to use a two-step initialization process:
-     1. First load the standard Module Federation manifest
-     2. Then load our custom versioning information
-   - Used Promise-based approach instead of async/await to avoid potential issues
-   - This ensures compatibility with the module federation plugin
-
-5. **Enhanced Fallback Mechanism**:
-   - Updated app.routes.ts with a robust error handling strategy:
-     - Try to load the Reports MFE using the dynamic remoteEntry URL
-     - If that fails, fall back to the standard manifest approach
-     - Added detailed logging to help with troubleshooting
-   - This ensures the application works even if the custom manifest loading fails
-
-### Next Steps
-
-1. **Version Management**:
-   - Implement automated version updates based on package.json
-   - Adopt semantic versioning strategy
-
-2. **Backward Compatibility**:
-   - Ensure older versions of the shell can still load newer MFEs
-   - Handle API changes between versions
-
-3. **Performance**:
-   - Implement caching strategies for manifest files
-   - Optimize loading of multiple versions
-
-4. **Error Handling**:
-   - Enhance fallback mechanisms for specific version unavailability
-   - Improve error messages for troubleshooting
-
----

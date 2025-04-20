@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "prestart": "node copy-assets.js",
-    "start": "ng serve",
+    "start": "ng serve shell",
     "prebuild": "node copy-assets.js",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
