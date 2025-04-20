@@ -1,8 +1,7 @@
-// src/app/services/version.service.ts
 import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
-// src/app/services/version.service.ts
+
 
 export class VersionService {
   private static desired: Record<string,string> = {
@@ -11,7 +10,7 @@ export class VersionService {
     settings_mfe:'1.0.0'
   };
 
-  // optional: read query param at import time
+  // read query param at import time
   static init() {
     const p = new URLSearchParams(window.location.search);
     const t = p.get('tasksVersion');
@@ -24,5 +23,4 @@ export class VersionService {
   }
 }
 
-// run init immediately:
 VersionService.init();

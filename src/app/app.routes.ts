@@ -17,7 +17,7 @@ export const routes: Routes = [
       }).then(m => m.routes);
     }
   },
-  // reports & settings unchanged
+
   {
     path: 'reports',
     loadChildren: () =>

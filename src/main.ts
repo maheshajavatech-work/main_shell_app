@@ -1,7 +1,6 @@
 import { loadManifest } from '@angular-architects/module-federation';
 import { environment } from './environments/environment';
 
-// The manifest path should be relative to the deployed application
 const manifestPath = environment.production
   ? 'assets/mf.manifest.prod.json'
   : 'assets/mf.manifest.local.json';
