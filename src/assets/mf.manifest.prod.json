@@ -1,6 +1,6 @@
 {
-    "tasks_mfe_v1.0.0": "https://d24sj5sfeucquy.cloudfront.net/v1.0.0/assets/mf.manifest.prod.json",
-    "tasks_mfe_v1.1.0": "https://d24sj5sfeucquy.cloudfront.net/v1.1.0/assets/mf.manifest.prod.json",
+    "tasks_mfe_v1.0.0": "https://d24sj5sfeucquy.cloudfront.net/v1.0.0/remoteEntry.js",
+    "tasks_mfe_v1.1.0": "https://d24sj5sfeucquy.cloudfront.net/v1.1.0/remoteEntry.js",
     "reports_mfe": "https://ddhet9i7mvwo.cloudfront.net/remoteEntry.js",
     "settings_mfe": "https://d23ys2uta19zlw.cloudfront.net/remoteEntry.js"
   }

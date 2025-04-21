@@ -1,6 +1,0 @@
-{
-    "tasks_mfe": "http://localhost:4201/remoteEntry.js",
-    "reports_mfe": "http://localhost:4202/remoteEntry.js",
-    "settings_mfe": "http://localhost:4203/remoteEntry.js"
-  }
-  

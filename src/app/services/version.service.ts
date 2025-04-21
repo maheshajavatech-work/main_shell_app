@@ -5,7 +5,7 @@ import { Injectable } from '@angular/core';
 
 export class VersionService {
   private static desired: Record<string,string> = {
-    tasks_mfe:   '1.1.0',
+    tasks_mfe:   '1.0.0',
     reports_mfe: '1.0.0',
     settings_mfe:'1.0.0'
   };
